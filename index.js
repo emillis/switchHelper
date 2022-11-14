@@ -83,6 +83,38 @@ async function CreateDataSet(job, datasetName, obj, tmp_file_store = SwitchConfi
     }
 }
 
+//Checking whether dataset exists
+async function DataSetExists(job, name) {
+    try {
+        for (let set of await job.listDatasets()) {
+            if (set["name"] !== name) {
+                continue
+            }
+
+            return true
+        }
+    } catch (e) {
+        await job.log(LogLevel.Warn, e.toString());
+        return false
+    }
+
+    return false
+}
+
+//Returns dataset as JSON object
+async function GetDataSet(job, name) {
+    try {
+        if (!await DataSetExists(job, name)) {
+            return undefined
+        }
+
+        return JSON.parse(fs.readFileSync(await job.getDataset(name, AccessLevel.ReadOnly), "utf-8"));
+    } catch (e) {
+        await job.log(LogLevel.Warn, e.toString());
+        return undefined
+    }
+}
+
 //Returns property value if name exist or undefined if it doesn't
 async function GetProperty(flowElement, name) {
     return await flowElement.hasProperty(name) ? await flowElement.getPropertyStringValue(name) : undefined
@@ -93,6 +125,8 @@ module.exports = {
     GenerateDateString,
     GenerateNewName,
     CreateDataSet,
+    DataSetExists,
+    GetDataSet,
     GetProperty,
     SwitchConfig,
 }
