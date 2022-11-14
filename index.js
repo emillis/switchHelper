@@ -65,9 +65,26 @@ async function GetProperty(flowElement, name) {
     return await flowElement.hasProperty(name) ? await flowElement.getPropertyStringValue(name) : undefined
 }
 
+//Reads environmental variable passed in (which is supposed to point to a Switch Config JSON file), reads
+//the file and returns as JSON object
+function GetGlobalSwitchConfig(env_var = "SwitchConfig") {
+    const loc = process.env[env_var]
+
+    if (!loc) {
+        throw Error(`Environmental variable "${env_var}" is not set!`)
+    }
+
+    if (path.parse(loc).ext !== ".json") {
+        throw Error(`Path to global settings for switch "${loc}" defined in ENV variable "${env_var}" does not point to a JSON file!`)
+    }
+
+    return JSON.parse(fs.readFileSync(loc, "utf-8"))
+}
+
 module.exports = {
-    GetProperty,
-    CreateDataSet,
     GenerateDateString,
-    GenerateNewName
+    GenerateNewName,
+    CreateDataSet,
+    GetProperty,
+    GetGlobalSwitchConfig
 }
