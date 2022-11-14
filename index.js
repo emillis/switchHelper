@@ -1,6 +1,28 @@
 const fs = require("fs");
 const path = require("path")
 
+let SwitchConfig = {};
+
+//Reads environmental variable passed in (which is supposed to point to a Switch Config JSON file), reads
+//the file and returns as JSON object
+function GetGlobalSwitchConfig(env_var = "SwitchConfig") {
+    const loc = process.env[env_var]
+
+    if (!loc) {
+        throw Error(`Environmental variable "${env_var}" is not set!`)
+    }
+
+    if (path.parse(loc).ext !== ".json") {
+        throw Error(`Path to global settings for switch "${loc}" defined in ENV variable "${env_var}" does not point to a JSON file!`)
+    }
+
+    return JSON.parse(fs.readFileSync(loc, "utf-8"))
+}
+
+try {SwitchConfig = GetGlobalSwitchConfig()} catch {}
+
+console.log(SwitchConfig);
+
 //Generates a date string in the following format: 20221011103552333. You can also define the separator.
 //If you chose ".", the date would look like this:  2022.10.11.10.35.52.333. You cal also omit the milliseconds
 //in which case it will look the same except without the segment
@@ -68,26 +90,11 @@ async function GetProperty(flowElement, name) {
     return await flowElement.hasProperty(name) ? await flowElement.getPropertyStringValue(name) : undefined
 }
 
-//Reads environmental variable passed in (which is supposed to point to a Switch Config JSON file), reads
-//the file and returns as JSON object
-function GetGlobalSwitchConfig(env_var = "SwitchConfig") {
-    const loc = process.env[env_var]
-
-    if (!loc) {
-        throw Error(`Environmental variable "${env_var}" is not set!`)
-    }
-
-    if (path.parse(loc).ext !== ".json") {
-        throw Error(`Path to global settings for switch "${loc}" defined in ENV variable "${env_var}" does not point to a JSON file!`)
-    }
-
-    return JSON.parse(fs.readFileSync(loc, "utf-8"))
-}
-
 module.exports = {
+    GetGlobalSwitchConfig,
     GenerateDateString,
     GenerateNewName,
     CreateDataSet,
     GetProperty,
-    GetGlobalSwitchConfig
+    SwitchConfig
 }
