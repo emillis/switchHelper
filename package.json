@@ -1,0 +1,11 @@
+{
+  "name": "switchhelpers",
+  "version": "1.0.0",
+  "description": "This module helps writing scripts in Enfocus Switch by adding functionality such as, \"CreateDataSet\" which doesn't require file creation, \"CopyDataSet\", etc..",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Emilis Mitrikas",
+  "license": "ISC"
+}
