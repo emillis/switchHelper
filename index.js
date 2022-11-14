@@ -30,13 +30,16 @@ function GenerateNewName(prefix = "", suffix = "", separator = "_") {
 //needs to be removed after "sendTo" is called so that there is no accumulation of
 //unnecessary temp files. To do so, this function returns an object with method "remove()".
 //This method needs to be called after any "sendTo" function in jobArrived.
-async function CreateDataSet(job, datasetName, obj, tmp_file_store = "D:/Switch Scripts/_tmp_auto_removal_72h") {
+async function CreateDataSet(job, datasetName, obj, tmp_file_store) {
     //Checking whether the right type of variables are supplied to the function
     if (typeof obj !== "object") {
         throw Error(`Expected to receive data type "object", got ${typeof obj}. Dataset can only be created from an object`)
     }
     if (typeof datasetName !== "string" || datasetName === "") {
         throw Error(`Dataset name "${datasetName.toString()}" is invalid!`)
+    }
+    if (!tmp_file_store || !fs.existsSync(tmp_file_store)) {
+        throw Error(`Invalid location "${tmp_file_store}" for storing temporary metadata files!`)
     }
 
     let location;
