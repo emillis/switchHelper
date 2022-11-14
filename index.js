@@ -105,13 +105,13 @@ async function DataSetExists(job, name) {
 async function GetDataSet(job, name) {
     try {
         if (!await DataSetExists(job, name)) {
-            return undefined
+            throw Error(`Dataset "${name}" does not exist!`)
         }
 
         return JSON.parse(fs.readFileSync(await job.getDataset(name, AccessLevel.ReadOnly), "utf-8"));
     } catch (e) {
         await job.log(LogLevel.Warn, e.toString());
-        return undefined
+        throw e.toString()
     }
 }
 
