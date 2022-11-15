@@ -94,7 +94,7 @@ async function DataSetExists(job, name) {
             return true
         }
     } catch (e) {
-        await job.log(LogLevel.Warn, e.toString());
+        await job.log("warning", e.toString());
         return false
     }
 
@@ -108,9 +108,9 @@ async function GetDataSet(job, name) {
             throw Error(`Dataset "${name}" does not exist!`)
         }
 
-        return JSON.parse(fs.readFileSync(await job.getDataset(name, AccessLevel.ReadOnly), "utf-8"));
+        return JSON.parse(fs.readFileSync(await job.getDataset(name, "readOnly"), "utf-8"));
     } catch (e) {
-        await job.log(LogLevel.Warn, e.toString());
+        await job.log("warning", e.toString());
         throw e.toString()
     }
 }
@@ -118,6 +118,15 @@ async function GetDataSet(job, name) {
 //Returns property value if name exist or undefined if it doesn't
 async function GetProperty(flowElement, name) {
     return await flowElement.hasProperty(name) ? await flowElement.getPropertyStringValue(name) : undefined
+}
+
+//Introduces delay into the process
+function Delay(t) {
+    return new Promise(function(resolve) {
+        setTimeout(function() {
+            resolve();
+        }, t);
+    });
 }
 
 module.exports = {
@@ -128,5 +137,6 @@ module.exports = {
     DataSetExists,
     GetDataSet,
     GetProperty,
+    Delay,
     SwitchConfig,
 }
