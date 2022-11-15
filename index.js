@@ -53,7 +53,7 @@ function GenerateNewName(prefix = "", suffix = "", separator = "_") {
 async function CreateDataSet(job, datasetName, obj, tmp_file_store = SwitchConfig["TempMetadataFileLocation"]) {
     //Checking whether the right type of variables are supplied to the function
     if (typeof obj !== "object") {
-        throw Error(`Expected to receive data type "object", got ${typeof obj}. Dataset can only be created from an object`)
+        throw Error(`Expected to receive data type "object", got "${typeof obj}"    . Dataset can only be created from an object`)
     }
     if (typeof datasetName !== "string" || datasetName === "") {
         throw Error(`Dataset name "${datasetName.toString()}" is invalid!`)
@@ -74,7 +74,7 @@ async function CreateDataSet(job, datasetName, obj, tmp_file_store = SwitchConfi
 
     fs.writeFileSync(location, JSON.stringify(obj))
 
-    await job.createDataset(datasetName, location, DatasetModel.JSON);
+    await job.createDataset(datasetName, location, "JSON");
 
     return {
         removeTmpFiles: function () {
