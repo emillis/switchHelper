@@ -138,5 +138,5 @@ module.exports = {
     GetDataSet,
     GetProperty,
     Delay,
-    SwitchConfig,
+    SwitchConfig: GetGlobalSwitchConfig(),
 }
