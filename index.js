@@ -17,10 +17,6 @@ function GetGlobalSwitchConfig(env_var = "SwitchConfig") {
     return JSON.parse(fs.readFileSync(loc, "utf-8"))
 }
 
-//Getting the switch config file by default as soon as the module is requested. This means that the import will
-//fail if the config file is not set
-let SwitchConfig = GetGlobalSwitchConfig()
-
 //Generates a date string in the following format: 20221011103552333. You can also define the separator.
 //If you chose ".", the date would look like this:  2022.10.11.10.35.52.333. You cal also omit the milliseconds
 //in which case it will look the same except without the segment
@@ -50,7 +46,13 @@ function GenerateNewName(prefix = "", suffix = "", separator = "_") {
 //needs to be removed after "sendTo" is called so that there is no accumulation of
 //unnecessary temp files. To do so, this function returns an object with method "remove()".
 //This method needs to be called after any "sendTo" function in jobArrived.
-async function CreateDataSet(job, datasetName, obj, tmp_file_store = SwitchConfig["TempMetadataFileLocation"]) {
+async function CreateDataSet(job, datasetName, obj, tmp_file_store) {
+    if (!tmp_file_store) {
+        tmp_file_store = GetGlobalSwitchConfig()["TempMetadataFileLocation"];
+        if (!tmp_file_store) {
+            throw Error(`Location where to store temporary created files could not been found for dataset name "${datasetName}"!`)
+        }
+    }
     //Checking whether the right type of variables are supplied to the function
     if (typeof obj !== "object") {
         throw Error(`Expected to receive data type "object", got "${typeof obj}"    . Dataset can only be created from an object`)
@@ -138,5 +140,4 @@ module.exports = {
     GetDataSet,
     GetProperty,
     Delay,
-    SwitchConfig: GetGlobalSwitchConfig(),
 }
