@@ -125,7 +125,14 @@ async function GetProperty(flowElement, name) {
 }
 
 //Converts Excel spreadsheet to separate json objects in a format: {sheet_name: sheet_as_csv_string}
-function ExcelToJsObject(excel_location, ignore_hidden_sheets = true, skip_hidden_rows = true, include_blank_rows = false) {
+function ExcelToJsObject(excel_location, options = {}) {
+    options = {
+        ignore_hidden_sheets: options.ignore_hidden_sheets === undefined ? true : options.ignore_hidden_sheets,
+        skip_hidden_rows: options.skip_hidden_rows === undefined ? true : options.skip_hidden_rows,
+        include_blank_rows: options.include_blank_rows === undefined ? false : options.include_blank_rows,
+        min_no_of_rows: options.min_no_of_rows === undefined ? 2 : options.min_no_of_rows
+    };
+
     if (!fs.existsSync(excel_location)) {
         throw Error(`Excel spreadsheet doesn't exist in the specified location "${excel_location}"!`)
     }
@@ -134,11 +141,17 @@ function ExcelToJsObject(excel_location, ignore_hidden_sheets = true, skip_hidde
     let result = {}
 
     for (let sheet of original.Workbook["Sheets"]) {
-        if (ignore_hidden_sheets && sheet["Hidden"]) {
+        if (options.ignore_hidden_sheets && sheet["Hidden"]) {
             continue
         }
 
-        result[sheet["name"]] = excel.utils.sheet_to_csv(original.Sheets[sheet["name"]], {blankrows: include_blank_rows, skipHidden: skip_hidden_rows});
+        const csv = excel.utils.sheet_to_csv(original.Sheets[sheet["name"]], {blankrows: options.include_blank_rows, skipHidden: options.skip_hidden_rows});
+
+        if ((csv.split(/\r\n|\r|\n/).length - 1) < options.min_no_of_rows) {
+            continue
+        }
+
+        result[sheet["name"]] = csv
     }
 
     return result
