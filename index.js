@@ -161,5 +161,6 @@ module.exports = {
     DataSetExists,
     GetDataSet,
     GetProperty,
+    ExcelToJsObject,
     Delay,
 }
