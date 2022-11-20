@@ -1,5 +1,6 @@
 const fs = require("fs");
-const path = require("path")
+const path = require("path");
+const excel = require("xlsx")
 
 //Reads environmental variable passed in (which is supposed to point to a Switch Config JSON file), reads
 //the file and returns as JSON object
@@ -42,10 +43,7 @@ function GenerateNewName(prefix = "", suffix = "", separator = "_") {
 
 //This is analogous to job.createDataset, except, this allows passing on json object
 //directly as a parameter which gets placed into the metadata. In order to do that,
-//internally, the function creates a temporary file and uses it as the metadata which
-//needs to be removed after "sendTo" is called so that there is no accumulation of
-//unnecessary temp files. To do so, this function returns an object with method "remove()".
-//This method needs to be called after any "sendTo" function in jobArrived.
+//internally, the function creates a temporary file and uses it as the metadata.
 async function CreateDataSet(job, datasetName, obj, tmp_file_store) {
     if (!tmp_file_store) {
         tmp_file_store = GetGlobalSwitchConfig()["TempMetadataFileLocation"];
@@ -119,7 +117,31 @@ async function GetDataSet(job, name) {
 
 //Returns property value if name exist or undefined if it doesn't
 async function GetProperty(flowElement, name) {
-    return await flowElement.hasProperty(name) ? await flowElement.getPropertyStringValue(name) : undefined
+    try {
+        return await flowElement.hasProperty(name) ? await flowElement.getPropertyStringValue(name) : undefined
+    } catch (e) {
+        return undefined
+    }
+}
+
+//Converts Excel spreadsheet to separate json objects in a format: {sheet_name: sheet_as_csv_string}
+function ExcelToJsObject(excel_location, ignore_hidden_sheets = true, skip_hidden_rows = true, include_blank_rows = false) {
+    if (!fs.existsSync(excel_location)) {
+        throw Error(`Excel spreadsheet doesn't exist in the specified location "${excel_location}"!`)
+    }
+    let original = excel.readFile(excel_location)
+
+    let result = {}
+
+    for (let sheet of original.Workbook["Sheets"]) {
+        if (ignore_hidden_sheets && sheet["Hidden"]) {
+            continue
+        }
+
+        result[sheet["name"]] = excel.utils.sheet_to_csv(original.Sheets[sheet["name"]], {blankrows: include_blank_rows, skipHidden: skip_hidden_rows});
+    }
+
+    return result
 }
 
 //Introduces delay into the process
