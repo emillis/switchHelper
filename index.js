@@ -166,6 +166,19 @@ function Delay(t) {
     });
 }
 
+//CompareString compares two strings with options to make a case-insensitive compare as well as partial match
+function CompareStrings(matchToThis, matchThis, options = {}) {
+    options.case_sensitive = options.case_sensitive === undefined ? true : options.case_sensitive
+    options.match_partial = options.match_partial === undefined ? false : options.match_partial
+
+    if (!options.case_sensitive) {
+        matchThis = matchThis.toLowerCase()
+        matchToThis = matchToThis.toLowerCase()
+    }
+
+    return options.match_partial ? matchToThis.search(matchThis) !== -1 : matchToThis === matchThis;
+}
+
 module.exports = {
     GetGlobalSwitchConfig,
     GenerateDateString,
