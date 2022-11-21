@@ -188,5 +188,6 @@ module.exports = {
     GetDataSet,
     GetProperty,
     ExcelToJsObject,
+    CompareStrings,
     Delay,
 }
