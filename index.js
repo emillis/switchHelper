@@ -44,16 +44,21 @@ function GenerateNewName(prefix = "", suffix = "", separator = "_") {
 //This is analogous to job.createDataset, except, this allows passing on json object
 //directly as a parameter which gets placed into the metadata. In order to do that,
 //internally, the function creates a temporary file and uses it as the metadata.
-async function CreateDataSet(job, datasetName, obj, tmp_file_store) {
+async function CreateDataSet(job, datasetName, data, tmp_file_store, datasetModel = "JSON") {
+    let allowedDatasetModels = ["JSON", "Opaque"];
+    if (!allowedDatasetModels.includes(datasetModel)) {
+        throw Error(`Dataset Model "${datasetModel}" is not supported! Allowed dataset models are: "${allowedDatasetModels.join(`", "`)}".`)
+    }
     if (!tmp_file_store) {
-        tmp_file_store = GetGlobalSwitchConfig()["TempMetadataFileLocation"];
+        let key = `TempMetadataFileLocation`;
+        tmp_file_store = GetGlobalSwitchConfig()[key];
         if (!tmp_file_store) {
-            throw Error(`Location where to store temporary created files could not been found for dataset name "${datasetName}"!`)
+            throw Error(`Location where to store temporary created files could not been found in the global switch config file where key should be "${key}" for dataset name "${datasetName}"!`)
         }
     }
     //Checking whether the right type of variables are supplied to the function
-    if (typeof obj !== "object") {
-        throw Error(`Expected to receive data type "object", got "${typeof obj}"    . Dataset can only be created from an object`)
+    if (typeof data !== "object") {
+        throw Error(`Expected to receive data type "object", got "${typeof data}"    . Dataset can only be created from an object`)
     }
     if (typeof datasetName !== "string" || datasetName === "") {
         throw Error(`Dataset name "${datasetName.toString()}" is invalid!`)
@@ -72,9 +77,11 @@ async function CreateDataSet(job, datasetName, obj, tmp_file_store) {
         break
     }
 
-    fs.writeFileSync(location, JSON.stringify(obj))
+    if (datasetModel === "JSON") {
+        fs.writeFileSync(location, JSON.stringify(data))
+    }
 
-    await job.createDataset(datasetName, location, "JSON");
+    await job.createDataset(datasetName, datasetModel === "JSON" ? location : data, "JSON");
 
     return {
         removeTmpFiles: function () {
