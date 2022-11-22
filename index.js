@@ -69,19 +69,23 @@ async function CreateDataSet(job, datasetName, data, tmp_file_store, datasetMode
 
     let location;
 
-    for (;;) {
-        location = path.join(tmp_file_store, `${GenerateNewName("dataset")}.json`);
-
-        if (fs.existsSync(location)) {continue}
-
-        break
-    }
-
     if (datasetModel === "JSON") {
+        for (;;) {
+            location = path.join(tmp_file_store, `${GenerateNewName("dataset")}.json`);
+
+            if (fs.existsSync(location)) {continue}
+
+            break
+        }
+
         fs.writeFileSync(location, JSON.stringify(data))
     }
 
-    await job.createDataset(datasetName, datasetModel === "JSON" ? location : data, "JSON");
+    if (datasetModel === "Opaque") {
+        location = data
+    }
+
+    await job.createDataset(datasetName, location, datasetModel);
 
     return {
         removeTmpFiles: function () {
