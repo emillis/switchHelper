@@ -57,8 +57,11 @@ async function CreateDataSet(job, datasetName, data, tmp_file_store, datasetMode
         }
     }
     //Checking whether the right type of variables are supplied to the function
-    if (typeof data !== "object") {
-        throw Error(`Expected to receive data type "object", got "${typeof data}"    . Dataset can only be created from an object`)
+    if (datasetModel === "JSON" && typeof data !== "object") {
+        throw Error(`When using "JSON" DatasetModel, expecting to receive data type "object", got "${typeof data}".`)
+    }
+    if (datasetModel === "Opaque" && typeof data !== "string") {
+        throw Error(`When using "Opaque" DatasetModel, expecting to receive data of type "string", got "${typeof data}".`)
     }
     if (typeof datasetName !== "string" || datasetName === "") {
         throw Error(`Dataset name "${datasetName.toString()}" is invalid!`)
