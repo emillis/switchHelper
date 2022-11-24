@@ -193,6 +193,48 @@ function CompareStrings(matchToThis, matchThis, options = {}) {
     return options.match_partial ? matchToThis.search(matchThis) !== -1 : matchToThis === matchThis;
 }
 
+//This function allows to scan a system location and returns the results
+//needle - what to look for allowedExt = [], partialMatch, returnType
+function FindFilesInLocation(needle, haystack, options) {
+    options = options || {}
+    if (typeof options !== "object") {throw Error(`Options must be of type "object", got "${typeof options}"!`)}
+    options = {
+        allowedExt: options.allowedExt || [],//empty array if nothing is defined
+        allowAllExt: !options.allowedExt || !options.allowedExt.length, //true if nothing is defined
+        partialMatch: options.partialMatch === undefined, //true by default
+        returnType: options.returnType || "full"
+    }
+    const allowedReturnTypes = ["full", "name", "nameProper"];
+    if (!allowedReturnTypes.includes(options.returnType)) {throw Error(`Wrong returnType entered! Entered: "${options.returnType}", allowed are: "${allowedReturnTypes.join(`", "`)}"`)}
+
+    let results = [];
+    const needleTLC = needle.toLowerCase()
+
+    for (let hay of fs.readdirSync(haystack, "utf-8")) {
+        if (options.partialMatch && (hay.toLowerCase()).search(needleTLC) === -1) {
+            continue
+        } else if (!options.partialMatch && hay.toLowerCase() !== needleTLC) {
+            continue
+        }
+
+        const parsedName = path.parse(hay);
+
+        if (!options.allowedExt.includes(parsedName.ext) && !options.allowAllExt) {
+            continue
+        }
+
+        if (options.returnType === "full") {
+            results.push(path.join(haystack, hay).replaceAll("\\", "/"))
+        } else if (options.returnType === "name") {
+            results.push(hay)
+        } else if (options.returnType === "nameProper") {
+            results.push(parsedName.name)
+        }
+    }
+
+    return results
+}
+
 module.exports = {
     GetGlobalSwitchConfig,
     GenerateDateString,
@@ -204,4 +246,5 @@ module.exports = {
     ExcelToJsObject,
     CompareStrings,
     Delay,
+    FindFilesInLocation,
 }
