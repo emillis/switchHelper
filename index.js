@@ -1,6 +1,8 @@
 const fs = require("fs");
 const path = require("path");
-const excel = require("xlsx")
+const excel = require("xlsx");
+const CsvReadableStream = require("csv-reader");
+const createCsvWriter = require('csv-writer').createArrayCsvWriter;
 
 //Reads environmental variable passed in (which is supposed to point to a Switch Config JSON file), reads
 //the file and returns as JSON object
@@ -194,7 +196,14 @@ function CompareStrings(matchToThis, matchThis, options = {}) {
 }
 
 //This function allows to scan a system location and returns the results
-//needle - what to look for allowedExt = [], partialMatch, returnType
+//needle - what to look for in the haystack.
+//haystack - root system location where to scan
+//options - {
+//  allowedExt,     //An array of extensions that are allowed to be returned. E.g. ".pdf", ".csv", etc.. If nothing
+//                  //is defined, all extensions will be allowed.
+//  partialMatch,   //true/false whether to match the name in full or just partially. Default - true
+//  returnType,     //Return type can be one of three: "full", "name", "nameProper". Default - "full"
+//}
 function FindFilesInLocation(needle, haystack, options) {
     options = options || {}
     if (typeof options !== "object") {throw Error(`Options must be of type "object", got "${typeof options}"!`)}
@@ -235,6 +244,123 @@ function FindFilesInLocation(needle, haystack, options) {
     return results
 }
 
+//ParseCsvFile takes in .csv file, places its contents into an object for manipulation and can save it back to .csv
+function CsvProcessor(location, options) {
+    options = options || {}
+    if (!location || !fs.existsSync(location)) {throw Error(`Csv file does not exist in the location "${location}"!`)}
+    if (!fs.statSync(location).isFile()) {throw Error(`Location supplied "${location}" is not a file!`)}
+    const parsedLocation = path.parse(location);
+    if (parsedLocation.ext !== ".csv") {throw Error(`Can only read .csv files, got "${parsedLocation.ext}"`)}
+
+    options = {
+        firstRowContainsHeaders: options.firstRowContainsHeaders === undefined ? true : !!options.firstRowContainsHeaders
+    }
+
+    let data = {
+        headers:[],
+        rows:[],
+        rowsStartIndex: 0 //Do not delete this.
+    }
+
+    //Returns the whole file as js object
+    this.getReference = function() {
+        return data;
+    }
+
+    //Returns headers if there were any
+    this.getHeaders = function() {
+        return data.headers
+    }
+
+    //Returns rows excluding headers
+    this.getRows = function() {
+        return data.rows
+    }
+
+    //Returns an array of values about the headers that match the keyword
+    this.findAllHeaders = function(keyword) {
+        keyword = keyword.toLowerCase()
+        let results = [];
+
+        for (let i = 0; i < data.headers.length; i++) {
+            let header = data.headers[i];
+
+            if (header.toLowerCase() !== keyword) {
+                continue
+            }
+
+            results.push({
+                index: i,
+                value: header
+            })
+        }
+
+        return results
+    }
+
+    //Returns a line number at which rows start (excluding headers)
+    this.rowsStartIndex = function() {
+        return data.rowsStartIndex
+    }
+
+    //Generates a new .csv file in the location provided.
+    //If full path provided (including file name), the csv is saved to that location with that name
+    //If only system location is provided (no name), file will be saved there with original name
+    //If nothing is provided, original file gets replaced
+    this.saveTo = async function(location) {
+        if (!location) {location = path.join(parsedLocation.dir, parsedLocation.base)}
+        let pLoc = path.parse(location);
+        if (!pLoc.ext) {
+            location = path.join(location, parsedLocation.base)
+            pLoc = path.parse(location)
+        }
+        if (!fs.existsSync(pLoc.dir)) {fs.mkdirSync(pLoc.dir)}
+
+        const csvWriter = createCsvWriter({path: location});
+
+        const records = [];
+
+        if (data.headers.length > 0) {
+            records.push(data.headers)
+        }
+
+        if (data.rows.length > 0) {
+            records.push(...data.rows)
+        }
+
+        return await csvWriter.writeRecords(records)
+    }
+
+    let thisFunc = this;
+    return new Promise(resolve=>{
+        let isHeader = options.firstRowContainsHeaders;
+        let rowIndex = 0;
+
+        fs.createReadStream(location, "utf-8")
+            .pipe(new CsvReadableStream({ parseNumbers: true, parseBooleans: true, trim: true }))
+            .on("data", row=>{
+                rowIndex++
+                if (isHeader) {
+                    data.headers = row
+                    isHeader = false
+                    return
+                }
+
+                if (!data.rowsStartIndex) {
+                    data.rowsStartIndex = rowIndex
+                }
+
+                data.rows.push(row)
+            }).on("end", ()=>{
+            resolve(thisFunc)
+        })
+    })
+}
+
+function MatchFilesToCsvData(options = {}) {
+
+}
+
 module.exports = {
     GetGlobalSwitchConfig,
     GenerateDateString,
@@ -247,4 +373,5 @@ module.exports = {
     CompareStrings,
     Delay,
     FindFilesInLocation,
+    CsvProcessor,
 }
