@@ -377,7 +377,7 @@ async function MatchFilesToCsvData(options = {}) {
     options = {
         csvLocation: options.csvLocation,
         saveLocation: options.saveLocation || options.csvLocation,
-        columnToMatch: options.columnToMatch.toString(),
+        columnToMatch: (options.columnToMatch||"").toString(),
         columnForResults: (options.columnForResults || "FileMatchResults").toString(),
         matchMethod: options.matchMethod === undefined ? "full" : options.matchMethod,
         resultsAppendMethod: options.resultsAppendMethod,
@@ -457,29 +457,31 @@ async function MatchFilesToCsvData(options = {}) {
         report.log.push(`Column "${columnToMatch.value}", row "${rowIndex}", value "${toMatch}" matched file "${path.parse(foundFile).base}". Placing the result to ${columnsForResults.length} ${columnsForResults.length > 1 ? "columns" : "column"} named "${columnsForResults[0].value}".`)
     }
 
-    //Returns all errors that occurred or an empty array if none did
-    this.errors = function () {
-        return [...report.errors]
-    }
+    return {
+        //Returns all errors that occurred or an empty array if none did
+        errors: function () {
+            return [...report.errors]
+        },
 
-    //Returns all warnings that occurred or an empty array if none did
-    this.warnings = function () {
-        return [...report.warnings]
-    }
+        //Returns all warnings that occurred or an empty array if none did
+        warnings: function () {
+            return [...report.warnings]
+        },
 
-    //Returns number of errors + warnings that have occurred. Returns "0" if none did
-    this.problems = function () {
-        return report.warnings.length + report.errors.length
-    }
+        //Returns number of errors + warnings that have occurred. Returns "0" if none did
+        problems: function () {
+            return report.warnings.length + report.errors.length
+        },
 
-    //Returns processing log
-    this.logs = function () {
-        return [...report.log]
-    }
+        //Returns processing log
+        logs: function () {
+            return [...report.log]
+        },
 
-    //Saves file to supplied location. If location is not supplied, options.saveLocation is used
-    this.saveFile = async function (loc = options.saveLocation) {
-        await csvFile.saveTo(loc)
+        //Saves file to supplied location. If location is not supplied, options.saveLocation is used
+        saveFile: async function (loc = options.saveLocation) {
+            await csvFile.saveTo(loc)
+        },
     }
 }
 
