@@ -523,6 +523,7 @@ module.exports = {
     GetGlobalSwitchConfig,
     GenerateDateString,
     GenerateNewName,
+    CreateNewTmpFile,
     CreateDataSet,
     DataSetExists,
     GetDataSet,
