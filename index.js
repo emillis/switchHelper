@@ -43,6 +43,40 @@ function GenerateNewName(prefix = "", suffix = "", separator = "_") {
     return `${prefix ? prefix+separator : ""}${GenerateDateString()}${separator}${Math.round(Math.random() * 1000000000000)}${suffix ? separator+suffix : ""}`
 }
 
+//Creates new temporary file. If nothing is provided, new random file is created at a location defined in the
+//global switch config file. Alternatively, you can provide either folder path only, file name only or full path.
+//After the file was created, full path to it is returned
+function CreateNewTmpFile(location = "", content = "") {
+    if (typeof location !== "string") {throw Error(`Invalid location provided. Expected "string", got ${typeof location}`)}
+    if (typeof content !== "string") {throw Error(`Wrong content type provided! Expected "string", got ${typeof content}`)}
+    let parsedLoc = path.parse(location)
+    if (parsedLoc.dir === "") {
+        parsedLoc = path.parse(path.join(GetGlobalSwitchConfig()["TempMetadataFileLocation"], parsedLoc.base))
+    }
+    if (parsedLoc.ext === "") {
+        parsedLoc = path.parse(path.join(parsedLoc.dir, parsedLoc.base, GenerateNewName("tmp_generic_file", ".txt")))
+    }
+
+    if (!fs.existsSync(parsedLoc.dir)) {
+        fs.mkdirSync(parsedLoc.dir)
+    }
+
+    let fullPath = path.join(parsedLoc.dir, parsedLoc.base);
+
+    for (;;) {
+        if (fs.existsSync(fullPath)) {
+            fullPath = path.join(parsedLoc.dir, `${GenerateDateString()}-${parsedLoc.base}`)
+            continue
+        }
+
+        break
+    }
+
+    fs.writeFileSync(fullPath, content, "utf-8")
+
+    return fullPath
+}
+
 //This is analogous to job.createDataset, except, this allows passing on json object
 //directly as a parameter which gets placed into the metadata. In order to do that,
 //internally, the function creates a temporary file and uses it as the metadata.
