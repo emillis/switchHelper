@@ -370,8 +370,9 @@ function CsvProcessor(location, options) {
 //                       full system path to the file. "name" - will append only the name. "nameProper" - will append
 //                       name without the extension.
 //  scanLocation: Location where to look for the files.
+//  useDifferentRootLocation: If "resultsAppendMethod" is set to "full" this allows to replace the root location
 async function MatchFilesToCsvData(options = {}) {
-    let report = {errors:[], warnings:[]}
+    let report = {log: [], errors:[], warnings:[]}
 
     options = {
         csvLocation: options.csvLocation,
@@ -381,6 +382,7 @@ async function MatchFilesToCsvData(options = {}) {
         matchMethod: options.matchMethod === undefined ? "full" : options.matchMethod,
         resultsAppendMethod: options.resultsAppendMethod,
         scanLocation: options.scanLocation,
+        useDifferentRootLocation: options.useDifferentRootLocation,
     }
 
     const allowedMatchMethods = ["full", "partial"];
@@ -429,7 +431,9 @@ async function MatchFilesToCsvData(options = {}) {
         const rowIndex = i + csvFile.rowsStartIndex();
 
         if (foundFiles.length < 1) {
-            report.warnings.push(`Could not find a match for value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>")!`)
+            const message = `Could not find a match for value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>")!`;
+            report.log.push(message)
+            report.warnings.push(message)
             continue
         }
 
@@ -438,40 +442,39 @@ async function MatchFilesToCsvData(options = {}) {
 
             for (let f of foundFiles) {fileNames.push(path.parse(f).base)}
 
-            report.warnings.push(`Value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>") have matched multiple (<b>${foundFiles.length}</b>) files! Those files are: "<b>${fileNames.join(`</b>", "<b>`)}</b>". Only one file is allowed to be matched.`)
+            const message = `Value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>") have matched multiple (<b>${foundFiles.length}</b>) files! Those files are: "<b>${fileNames.join(`</b>", "<b>`)}</b>". Only one file is allowed to be matched`;
+            report.log.push(message)
+            report.warnings.push(message)
             continue
         }
 
+        const foundFile = options.resultsAppendMethod === "full" && options.useDifferentRootLocation ? path.join(options.useDifferentRootLocation, path.parse(foundFiles[0]).base) : foundFiles[0]
+
         for (let resultColumn of columnsForResults) {
-            csvFileData.rows[i][resultColumn.index] = foundFiles[0];
+            csvFileData.rows[i][resultColumn.index] = foundFile;
         }
+
+        report.log.push(`Column "${columnToMatch.value}", row "${rowIndex}", value "${toMatch}" matched file "${path.parse(foundFile).base}". Placing the result to ${columnsForResults.length} ${columnsForResults.length > 1 ? "columns" : "column"} named "${columnsForResults[0].value}".`)
     }
 
     //Returns all errors that occurred or an empty array if none did
     this.errors = function () {
-        let e = [];
-
-        for (let err of report.errors) {
-            e.push(err)
-        }
-
-        return e
+        return [...report.errors]
     }
 
     //Returns all warnings that occurred or an empty array if none did
     this.warnings = function () {
-        let w = [];
-
-        for (let warning of report.warnings) {
-            w.push(warning)
-        }
-
-        return w
+        return [...report.warnings]
     }
 
     //Returns number of errors + warnings that have occurred. Returns "0" if none did
     this.problems = function () {
         return report.warnings.length + report.errors.length
+    }
+
+    //Returns processing log
+    this.logs = function () {
+        return [...report.log]
     }
 
     //Saves file to supplied location. If location is not supplied, options.saveLocation is used
