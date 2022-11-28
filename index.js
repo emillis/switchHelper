@@ -210,9 +210,10 @@ function FindFilesInLocation(needle, haystack, options) {
     options = {
         allowedExt: options.allowedExt || [],//empty array if nothing is defined
         allowAllExt: !options.allowedExt || !options.allowedExt.length, //true if nothing is defined
-        partialMatch: options.partialMatch === undefined, //true by default
+        partialMatch: options.partialMatch === undefined ? true : options.partialMatch, //true by default
         returnType: options.returnType || "full"
     }
+
     const allowedReturnTypes = ["full", "name", "nameProper"];
     if (!allowedReturnTypes.includes(options.returnType)) {throw Error(`Wrong returnType entered! Entered: "${options.returnType}", allowed are: "${allowedReturnTypes.join(`", "`)}"`)}
 
@@ -357,8 +358,126 @@ function CsvProcessor(location, options) {
     })
 }
 
-function MatchFilesToCsvData(options = {}) {
+//MatchFilesToCsvData allows to match a column from .csv file to files in a location and populate another column with the results
+//Available options are as follows:
+//  csvLocation: Full path to a .csv file
+//  saveLocation: Location where you'd wish to save the result. If none is provided, the file gets overwritten
+//  columnToMatch: Column title that suppose to match with the files from "scanLocation" option
+//  columnForResults: Column title where the matched results should be placed
+//  matchedMethod: "full"|"partial". Method of matching .csv column to files. "full" - must match the full name. "partial" - can
+//                 match only part of the name.
+//  resultsAppendMethod: "full"|"name"|"nameProper". What will be placed in the "columnForResults". "full" - will append
+//                       full system path to the file. "name" - will append only the name. "nameProper" - will append
+//                       name without the extension.
+//  scanLocation: Location where to look for the files.
+async function MatchFilesToCsvData(options = {}) {
+    let report = {errors:[], warnings:[]}
 
+    options = {
+        csvLocation: options.csvLocation,
+        saveLocation: options.saveLocation || options.csvLocation,
+        columnToMatch: options.columnToMatch.toString(),
+        columnForResults: (options.columnForResults || "FileMatchResults").toString(),
+        matchMethod: options.matchMethod === undefined ? "full" : options.matchMethod,
+        resultsAppendMethod: options.resultsAppendMethod,
+        scanLocation: options.scanLocation,
+    }
+
+    const allowedMatchMethods = ["full", "partial"];
+    const allowedResultsAppendMethod = ["full", "name", "nameProper"];
+    if (!fs.existsSync(options.csvLocation)) {throw Error(`Csv file does not exist in the location "${options.csvLocation}"`)}
+    if (path.parse(options.csvLocation).ext !== ".csv") {throw Error(`File in location "${options.csvLocation}" is not a .csv file!`)}
+    if (!options.columnToMatch) {throw Error(`Column to match in the .csv file is note defined! Expected a string, got "${options.columnToMatch}"`)}
+    if (!options.columnForResults) {throw Error(`Column name where to put the results was not defined! Expected a string value, got "${options.columnForResults}"`)}
+    if (!options.scanLocation) {throw Error(`Scan location was not provided! Excepted system location, got "${options.scanLocation}"`)}
+    if (!fs.existsSync(options.scanLocation)) {throw Error(`Scan location "${options.scanLocation}" does not exist!`)}
+    if (path.parse(options.scanLocation).ext) {throw Error(`File location provided instead of a system path. Expected system path, got path to file "${options.scanLocation}"`)}
+    if (!allowedMatchMethods.includes(options.matchMethod)) {throw Error(`Match method "${options.matchMethod}" is not allowed! Allowed match methods are: "${allowedMatchMethods.join(`", "`)}"`)}
+    if (!allowedResultsAppendMethod.includes(options.resultsAppendMethod)) {throw Error(`Results append method "${options.resultsAppendMethod}" is not allowed! Allowed methods are: "${allowedResultsAppendMethod.join(`", "`)}"`)}
+
+    let csvFile = await new CsvProcessor(options.csvLocation);
+    let csvFileData = csvFile.getReference();
+
+    let columnToMatch = csvFile.findAllHeaders(options.columnToMatch);
+    let columnsForResults = csvFile.findAllHeaders(options.columnForResults);
+
+    if (columnToMatch.length > 1) {
+        report.errors.push(`In the .csv file supplied, got "<b>${columnToMatch.length}</b>" columns with title "<b>${options.columnToMatch}</b>". Only one such column is allowed!`)
+        throw report
+    }
+    if (columnToMatch.length < 1) {
+        report.errors.push(`Could not find column "${options.columnToMatch}" defined in the .csv file!`)
+    }
+
+    columnToMatch = columnToMatch[0]
+
+    if (columnsForResults < 1) {
+        csvFileData.headers.push(options.columnForResults);
+        columnsForResults = csvFile.findAllHeaders(options.columnForResults)
+    }
+
+    let o = {
+        allowedExt: [".pdf"],
+        partialMatch: options.matchMethod === undefined ? "partial" : options.matchMethod,
+        returnType: options.resultsAppendMethod === undefined ? "full" : options.resultsAppendMethod,
+    }
+
+    for (let i = 0; i< csvFileData.rows.length; i++) {
+        let row = csvFileData.rows[i];
+        const toMatch = row[columnToMatch.index]
+        const foundFiles = FindFilesInLocation(toMatch, options.scanLocation, o)
+        const rowIndex = i + csvFile.rowsStartIndex();
+
+        if (foundFiles.length < 1) {
+            report.warnings.push(`Could not find a match for value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>")!`)
+            continue
+        }
+
+        if (foundFiles.length > 1) {
+            let fileNames = [];
+
+            for (let f of foundFiles) {fileNames.push(path.parse(f).base)}
+
+            report.warnings.push(`Value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>") have matched multiple (<b>${foundFiles.length}</b>) files! Those files are: "<b>${fileNames.join(`</b>", "<b>`)}</b>". Only one file is allowed to be matched.`)
+            continue
+        }
+
+        for (let resultColumn of columnsForResults) {
+            csvFileData.rows[i][resultColumn.index] = foundFiles[0];
+        }
+    }
+
+    //Returns all errors that occurred or an empty array if none did
+    this.errors = function () {
+        let e = [];
+
+        for (let err of report.errors) {
+            e.push(err)
+        }
+
+        return e
+    }
+
+    //Returns all warnings that occurred or an empty array if none did
+    this.warnings = function () {
+        let w = [];
+
+        for (let warning of report.warnings) {
+            w.push(warning)
+        }
+
+        return w
+    }
+
+    //Returns number of errors + warnings that have occurred. Returns "0" if none did
+    this.problems = function () {
+        return report.warnings.length + report.errors.length
+    }
+
+    //Saves file to supplied location. If location is not supplied, options.saveLocation is used
+    this.saveFile = async function (loc = options.saveLocation) {
+        await csvFile.saveTo(loc)
+    }
 }
 
 module.exports = {
@@ -374,4 +493,5 @@ module.exports = {
     Delay,
     FindFilesInLocation,
     CsvProcessor,
+    MatchFilesToCsvData,
 }
