@@ -4,6 +4,18 @@ const excel = require("xlsx");
 const CsvReadableStream = require("csv-reader");
 const createCsvWriter = require('csv-writer').createArrayCsvWriter;
 
+function createLogString(message, level) {
+    let colours = {
+        success: "#28a745",
+        warning: "#ffc107",
+        error: "#dc3545",
+    }
+
+    let color = colours[level] || "#aaa"
+
+    return `<div><div style="margin: 0 1rem 0 0;border-radius: 10rem ;width: 1rem; height: 1rem; display: inline-block; background-color: ${color}"></div>${message}</div>`
+}
+
 //Reads environmental variable passed in (which is supposed to point to a Switch Config JSON file), reads
 //the file and returns as JSON object
 function GetGlobalSwitchConfig(env_var = "SwitchConfig") {
@@ -465,7 +477,7 @@ async function MatchFilesToCsvData(options = {}) {
         const rowIndex = i + csvFile.rowsStartIndex();
 
         if (foundFiles.length < 1) {
-            const message = `Could not find a match for value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>")!`;
+            const message = createLogString(`Could not find a match for value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>")!`, "warning");
             report.log.push(message)
             report.warnings.push(message)
             continue
@@ -476,7 +488,7 @@ async function MatchFilesToCsvData(options = {}) {
 
             for (let f of foundFiles) {fileNames.push(path.parse(f).base)}
 
-            const message = `Value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>") have matched multiple (<b>${foundFiles.length}</b>) files! Those files are: "<b>${fileNames.join(`</b>", "<b>`)}</b>". Only one file is allowed to be matched`;
+            const message = createLogString(`Value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>") have matched multiple (<b>${foundFiles.length}</b>) files! Those files are: "<b>${fileNames.join(`</b>", "<b>`)}</b>". Only one file is allowed to be matched!`, "warning");
             report.log.push(message)
             report.warnings.push(message)
             continue
@@ -488,7 +500,7 @@ async function MatchFilesToCsvData(options = {}) {
             csvFileData.rows[i][resultColumn.index] = foundFile;
         }
 
-        report.log.push(`Column "${columnToMatch.value}", row "${rowIndex}", value "${toMatch}" matched file "${path.parse(foundFile).base}". Placing the result to ${columnsForResults.length} ${columnsForResults.length > 1 ? "columns" : "column"} named "${columnsForResults[0].value}".`)
+        report.log.push(createLogString(`Column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>", value "<b>${toMatch}</b>" matched file "<b>${path.parse(foundFile).base}</b>". Placing the result to ${columnsForResults.length} ${columnsForResults.length > 1 ? "columns" : "column"} in the .csv file, named "<b>${columnsForResults[0].value}</b>".`, "success"))
     }
 
     return {
@@ -515,7 +527,42 @@ async function MatchFilesToCsvData(options = {}) {
         //Saves file to supplied location. If location is not supplied, options.saveLocation is used
         saveFile: async function (loc = options.saveLocation) {
             await csvFile.saveTo(loc)
+            return `Saved to location "${loc}".`
         },
+    }
+}
+
+//Provides an easy way of managing "Traffic Lights" switch connection type
+function OutgoingConnectionManager(switchJob) {
+    const job = switchJob;
+    const allowedLevels = ["success", "warning", "error"];
+
+    async function send(level, report) {
+        if (!allowedLevels.includes(level)) {throw Error(`Invalid connection level supplied! Expected "${allowedLevels.join(`" or "`)}", got "${lvl}"`)}
+        if (report && !fs.existsSync(report.toString())) {throw Error(`Report doesn't exist in the location "${report.toString()}" provided!`)}
+
+        try {
+            if (report) {
+                const reportJob = await job.createChild(report);
+                await reportJob.sendToLog(level, "Opaque");
+            }
+
+            await job.sendToData(level);
+        } catch (e) {
+            await job.log("error", e.toString());
+        }
+    }
+
+    this.success = async function (report){
+        await send("success", report);
+    }
+
+    this.warning = async function (report){
+        await send("warning", report);
+    }
+
+    this.error = async function (report){
+        await send("error", report);
     }
 }
 
@@ -534,4 +581,5 @@ module.exports = {
     FindFilesInLocation,
     CsvProcessor,
     MatchFilesToCsvData,
+    OutgoingConnectionManager,
 }
