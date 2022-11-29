@@ -4,16 +4,96 @@ const excel = require("xlsx");
 const CsvReadableStream = require("csv-reader");
 const createCsvWriter = require('csv-writer').createArrayCsvWriter;
 
-function createLogString(message, level) {
-    let colours = {
-        success: "#28a745",
-        warning: "#ffc107",
-        error: "#dc3545",
+//Constructor for ease of creation of Switch Report
+function SwitchReport() {
+
+    let options = {
+        PageTitle: "",
+        TabTitle: "",
+        Rows: [],
     }
 
-    let color = colours[level] || "#aaa"
+    const thisFunction = this;
 
-    return `<div><div style="margin: 0 1rem 0 0;border-radius: 10rem ;width: 1rem; height: 1rem; display: inline-block; background-color: ${color}"></div>${message}</div>`
+    this.setPageTitle = function (newTitle) {
+        options.PageTitle = newTitle
+
+        return thisFunction;
+    }
+    this.getPageTitle = function () {
+        return options.PageTitle
+    }
+
+    this.setTabTitle = function (newTitle) {
+        options.TabTitle = newTitle
+
+        return thisFunction;
+    }
+    this.getTabTitle = function () {
+        return options.TabTitle
+    }
+
+    this.addRow = function (rowType, message) {
+        let colours = {
+            success: "#28a745",
+            warning: "#ffc107",
+            error: "#dc3545",
+        }
+
+        let color = colours[rowType] || "#999"
+
+        options.Rows.push(`
+            <div class="row">
+              <div class="cell-status" style="background-color: ${color}"></div>
+              <div class="cell-message">${message}</div>
+            </div>
+        `)
+    }
+
+    this.getReport = function () {
+        return `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+              <meta charset="UTF-8">
+              <title>${options.TabTitle}</title>
+              <style>
+                #page-title {
+                  text-align: center;
+                }
+            
+                .row {
+                  display: flex;
+                  margin: 0 0 .5rem 0;
+                }
+                .row .cell-message {
+                  flex: 24;
+                  padding: 0 0 0 1rem;
+                }
+                .row .cell-status {
+                  flex: 1rem;
+                }
+            
+                #status-info {
+                  font-size: .875rem;
+                }
+              </style>
+            </head>
+            <body>
+              <div id="page-title">
+                <h2>${options.PageTitle}</h2>
+              </div>
+              <div id="rows">
+                ${options.Rows.join()}
+              </div>
+              <hr style="margin: 2rem 0">
+              <div id="status-info">
+                Time Created: ${GenerateDateString(".", false)}
+              </div>
+            </body>
+            </html>
+        `
+    }
 }
 
 //Reads environmental variable passed in (which is supposed to point to a Switch Config JSON file), reads
@@ -567,6 +647,7 @@ function OutgoingConnectionManager(switchJob) {
 }
 
 module.exports = {
+    SwitchReport,
     GetGlobalSwitchConfig,
     GenerateDateString,
     GenerateNewName,
