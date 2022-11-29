@@ -10,6 +10,11 @@ function SwitchReport() {
     let options = {
         PageTitle: "",
         TabTitle: "",
+        RowCounts: {
+            Error: 0,
+            Warning: 0,
+            Success: 0,
+        },
         Rows: [],
     }
 
@@ -33,24 +38,49 @@ function SwitchReport() {
         return options.TabTitle
     }
 
-    this.addRow = function (rowType, message) {
+    this.addErrorRow = function (...messages) {
+        thisFunction.addRow("error", ...messages);
+        options.RowCounts.Error++
+    }
+    this.addWarningRow = function (...messages) {
+        thisFunction.addRow("warning", ...messages);
+        options.RowCounts.Warning++
+    }
+    this.addSuccessRow = function (...messages) {
+        thisFunction.addRow("success", ...messages);
+        options.RowCounts.Success++
+    }
+
+    this.addRow = function (rowType, ...messages) {
         let colours = {
-            success: "#28a745",
-            warning: "#ffc107",
-            error: "#dc3545",
+            success: "bg-success",
+            warning: "bg-warning",
+            error: "bg-error",
         }
 
-        let color = colours[rowType] || "#999"
+        let color = colours[rowType] || "bg-default"
 
-        options.Rows.push(`
+        for (let message of messages) {
+            options.Rows.push(`
             <div class="row">
-              <div class="cell-status" style="background-color: ${color}"></div>
+              <div class="cell-status ${color}"></div>
               <div class="cell-message">${message}</div>
             </div>
         `)
+        }
     }
 
-    this.getReport = function () {
+    this.ErrorCount = function () {
+        return options.RowCounts.Error
+    }
+    this.WarningCount = function () {
+        return options.RowCounts.Warning
+    }
+    this.SuccessCount = function () {
+        return options.RowCounts.Success
+    }
+
+    this.generateHtmlReport = function () {
         return `
             <!DOCTYPE html>
             <html lang="en">
@@ -66,6 +96,9 @@ function SwitchReport() {
                   display: flex;
                   margin: 0 0 .5rem 0;
                 }
+                .row:hover {
+                  background-color: #eee;
+                }
                 .row .cell-message {
                   flex: 24;
                   padding: 0 0 0 1rem;
@@ -76,6 +109,19 @@ function SwitchReport() {
             
                 #status-info {
                   font-size: .875rem;
+                }
+                
+                .bg-error {
+                  background-color: #dc3545;
+                }
+                .bg-warning {
+                  background-color: #ffc107;
+                }
+                .bg-success {
+                  background-color: #28a745;
+                }
+                .bg-default {
+                  background-color: #999;
                 }
               </style>
             </head>
@@ -498,7 +544,7 @@ function CsvProcessor(location, options) {
 //  scanLocation: Location where to look for the files.
 //  useDifferentRootLocation: If "resultsAppendMethod" is set to "full" this allows to replace the root location
 async function MatchFilesToCsvData(options = {}) {
-    let report = {log: [], errors:[], warnings:[]}
+    const reporter = new SwitchReport();
 
     options = {
         csvLocation: options.csvLocation,
@@ -509,6 +555,16 @@ async function MatchFilesToCsvData(options = {}) {
         resultsAppendMethod: options.resultsAppendMethod,
         scanLocation: options.scanLocation,
         useDifferentRootLocation: options.useDifferentRootLocation,
+    }
+
+    const functionality = {
+        report: reporter,
+
+        //Saves file to supplied location. If location is not supplied, options.saveLocation is used
+        saveFile: async function (loc = options.saveLocation) {
+            await csvFile.saveTo(loc)
+            return `Saved to location "${loc}".`
+        },
     }
 
     const allowedMatchMethods = ["full", "partial"];
@@ -529,12 +585,9 @@ async function MatchFilesToCsvData(options = {}) {
     let columnToMatch = csvFile.findAllHeaders(options.columnToMatch);
     let columnsForResults = csvFile.findAllHeaders(options.columnForResults);
 
-    if (columnToMatch.length > 1) {
-        report.errors.push(`In the .csv file supplied, got "<b>${columnToMatch.length}</b>" columns with title "<b>${options.columnToMatch}</b>". Only one such column is allowed!`)
-        throw report
-    }
-    if (columnToMatch.length < 1) {
-        report.errors.push(`Could not find column "${options.columnToMatch}" defined in the .csv file!`)
+    if (columnToMatch.length !== 1) {
+        reporter.addErrorRow(`Csv file must contain only one column "<b>${options.columnToMatch}</b>". Found <b>${columnToMatch.length}</b>!`)
+        return functionality
     }
 
     columnToMatch = columnToMatch[0]
@@ -557,9 +610,7 @@ async function MatchFilesToCsvData(options = {}) {
         const rowIndex = i + csvFile.rowsStartIndex();
 
         if (foundFiles.length < 1) {
-            const message = createLogString(`Could not find a match for value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>")!`, "warning");
-            report.log.push(message)
-            report.warnings.push(message)
+            reporter.addWarningRow(`Could not find a match for value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>")!`)
             continue
         }
 
@@ -568,9 +619,7 @@ async function MatchFilesToCsvData(options = {}) {
 
             for (let f of foundFiles) {fileNames.push(path.parse(f).base)}
 
-            const message = createLogString(`Value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>") have matched multiple (<b>${foundFiles.length}</b>) files! Those files are: "<b>${fileNames.join(`</b>", "<b>`)}</b>". Only one file is allowed to be matched!`, "warning");
-            report.log.push(message)
-            report.warnings.push(message)
+            reporter.addWarningRow(`Value "<b>${toMatch}</b>" (column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>") have matched multiple (<b>${foundFiles.length}</b>) files! Those files are: "<b>${fileNames.join(`</b>", "<b>`)}</b>". Only one file is allowed to be matched!`)
             continue
         }
 
@@ -580,36 +629,10 @@ async function MatchFilesToCsvData(options = {}) {
             csvFileData.rows[i][resultColumn.index] = foundFile;
         }
 
-        report.log.push(createLogString(`Column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>", value "<b>${toMatch}</b>" matched file "<b>${path.parse(foundFile).base}</b>". Placing the result to ${columnsForResults.length} ${columnsForResults.length > 1 ? "columns" : "column"} in the .csv file, named "<b>${columnsForResults[0].value}</b>".`, "success"))
+        reporter.addSuccessRow(`Column "<b>${columnToMatch.value}</b>", row "<b>${rowIndex}</b>", value "<b>${toMatch}</b>" matched file "<b>${path.parse(foundFile).base}</b>". Placing the result to ${columnsForResults.length} ${columnsForResults.length > 1 ? "columns" : "column"} in the .csv file, named "<b>${columnsForResults[0].value}</b>".`);
     }
 
-    return {
-        //Returns all errors that occurred or an empty array if none did
-        errors: function () {
-            return [...report.errors]
-        },
-
-        //Returns all warnings that occurred or an empty array if none did
-        warnings: function () {
-            return [...report.warnings]
-        },
-
-        //Returns number of errors + warnings that have occurred. Returns "0" if none did
-        problems: function () {
-            return report.warnings.length + report.errors.length
-        },
-
-        //Returns processing log
-        logs: function () {
-            return [...report.log]
-        },
-
-        //Saves file to supplied location. If location is not supplied, options.saveLocation is used
-        saveFile: async function (loc = options.saveLocation) {
-            await csvFile.saveTo(loc)
-            return `Saved to location "${loc}".`
-        },
-    }
+    return functionality;
 }
 
 //Provides an easy way of managing "Traffic Lights" switch connection type
