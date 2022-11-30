@@ -130,7 +130,7 @@ function SwitchReport() {
                 <h2>${options.PageTitle}</h2>
               </div>
               <div id="rows">
-                ${options.Rows.join()}
+                ${options.Rows.join("")}
               </div>
               <hr style="margin: 2rem 0">
               <div id="status-info">
