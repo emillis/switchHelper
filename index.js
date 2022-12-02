@@ -140,6 +140,10 @@ function SwitchReport() {
             </html>
         `
     }
+
+    this.generateHtmlReportAsFile = function(tmpFileLocation) {
+        return CreateNewTmpFile(path.join(tmpFileLocation, GenerateNewName(`tmpHtml`, `_report.html`)), thisFunction.generateHtmlReport())
+    }
 }
 
 //Reads environmental variable passed in (which is supposed to point to a Switch Config JSON file), reads
@@ -543,6 +547,7 @@ function CsvProcessor(location, options) {
 //                       name without the extension.
 //  scanLocation: Location where to look for the files.
 //  useDifferentRootLocation: If "resultsAppendMethod" is set to "full" this allows to replace the root location
+//  ifColumnToMatchNotPresent: Allowed three options: "success", "warning", "error". Will place a log message to report accordingly
 async function MatchFilesToCsvData(options = {}) {
     const reporter = new SwitchReport();
 
@@ -555,6 +560,7 @@ async function MatchFilesToCsvData(options = {}) {
         resultsAppendMethod: options.resultsAppendMethod,
         scanLocation: options.scanLocation,
         useDifferentRootLocation: options.useDifferentRootLocation,
+        ifColumnToMatchNotPresent: options.ifColumnToMatchNotPresent || "success"
     }
 
     const functionality = {
@@ -569,6 +575,7 @@ async function MatchFilesToCsvData(options = {}) {
 
     const allowedMatchMethods = ["full", "partial"];
     const allowedResultsAppendMethod = ["full", "name", "nameProper"];
+    const allowedIfColumnToMatchNotPresent = ["success", "warning", "error"];
     if (!fs.existsSync(options.csvLocation)) {throw Error(`Csv file does not exist in the location "${options.csvLocation}"`)}
     if (path.parse(options.csvLocation).ext !== ".csv") {throw Error(`File in location "${options.csvLocation}" is not a .csv file!`)}
     if (!options.columnToMatch) {throw Error(`Column to match in the .csv file is note defined! Expected a string, got "${options.columnToMatch}"`)}
@@ -578,6 +585,7 @@ async function MatchFilesToCsvData(options = {}) {
     if (path.parse(options.scanLocation).ext) {throw Error(`File location provided instead of a system path. Expected system path, got path to file "${options.scanLocation}"`)}
     if (!allowedMatchMethods.includes(options.matchMethod)) {throw Error(`Match method "${options.matchMethod}" is not allowed! Allowed match methods are: "${allowedMatchMethods.join(`", "`)}"`)}
     if (!allowedResultsAppendMethod.includes(options.resultsAppendMethod)) {throw Error(`Results append method "${options.resultsAppendMethod}" is not allowed! Allowed methods are: "${allowedResultsAppendMethod.join(`", "`)}"`)}
+    if (!allowedIfColumnToMatchNotPresent.includes(options.ifColumnToMatchNotPresent)) {throw Error(`Option "ifColumnToMatchNotPresent" is allowed to have values "${allowedIfColumnToMatchNotPresent.join(`" or "`)}", got "${options.ifColumnToMatchNotPresent}"`)}
 
     let csvFile = await new CsvProcessor(options.csvLocation);
     let csvFileData = csvFile.getReference();
@@ -585,8 +593,21 @@ async function MatchFilesToCsvData(options = {}) {
     let columnToMatch = csvFile.findAllHeaders(options.columnToMatch);
     let columnsForResults = csvFile.findAllHeaders(options.columnForResults);
 
-    if (columnToMatch.length !== 1) {
-        reporter.addErrorRow(`Csv file must contain only one column "<b>${options.columnToMatch}</b>". Found <b>${columnToMatch.length}</b>!`)
+    if (columnToMatch.length < 1) {
+        const message = `There were no column "<b>${options.columnToMatch}</b>" present, therefore, no file matching has been made.`;
+
+        if (options.ifColumnToMatchNotPresent === "success") {
+            reporter.addSuccessRow(message)
+        } else if (options.ifColumnToMatchNotPresent === "warning") {
+            reporter.addWarningRow(message)
+        } else {
+            reporter.addErrorRow(message)
+        }
+
+        return functionality
+    }
+    if (columnToMatch.length > 1) {
+        reporter.addErrorRow(`Csv file cannot contain more than one column with title "<b>${options.columnToMatch}</b>". Found <b>${columnToMatch.length}</b> columns!`)
         return functionality
     }
 
