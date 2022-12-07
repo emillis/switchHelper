@@ -188,7 +188,7 @@ function GenerateNewName(prefix = "", suffix = "", separator = "_") {
 //Creates new temporary file. If nothing is provided, new random file is created at a location defined in the
 //global switch config file. Alternatively, you can provide either folder path only, file name only or full path.
 //After the file was created, full path to it is returned
-function CreateNewTmpFile(location = "", content = "") {
+function CreateNewTmpFile(location = "", content = "", overwrite = false) {
     if (typeof location !== "string") {throw Error(`Invalid location provided. Expected "string", got ${typeof location}`)}
     if (typeof content !== "string") {throw Error(`Wrong content type provided! Expected "string", got ${typeof content}`)}
     let parsedLoc = path.parse(location)
@@ -206,7 +206,7 @@ function CreateNewTmpFile(location = "", content = "") {
     let fullPath = path.join(parsedLoc.dir, parsedLoc.base);
 
     for (;;) {
-        if (fs.existsSync(fullPath)) {
+        if (fs.existsSync(fullPath) && !overwrite) {
             fullPath = path.join(parsedLoc.dir, `${GenerateDateString()}-${parsedLoc.base}`)
             continue
         }
