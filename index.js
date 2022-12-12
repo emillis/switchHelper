@@ -15,6 +15,12 @@ function SwitchReport() {
             Warning: 0,
             Success: 0,
         },
+        MessageByType: {
+            Error: [],
+            Warning: [],
+            Success: [],
+            Log: [],
+        },
         Rows: [],
     }
 
@@ -40,14 +46,17 @@ function SwitchReport() {
 
     this.addErrorRow = function (...messages) {
         thisFunction.addRow("error", ...messages);
+        options.MessageByType.Error.push(...messages)
         options.RowCounts.Error++
     }
     this.addWarningRow = function (...messages) {
         thisFunction.addRow("warning", ...messages);
+        options.MessageByType.Warning.push(...messages)
         options.RowCounts.Warning++
     }
     this.addSuccessRow = function (...messages) {
         thisFunction.addRow("success", ...messages);
+        options.MessageByType.Success.push(...messages)
         options.RowCounts.Success++
     }
 
@@ -79,6 +88,10 @@ function SwitchReport() {
     this.SuccessCount = function () {
         return options.RowCounts.Success
     }
+
+    this.ListErrors = function () {return options.MessageByType.Error}
+    this.ListWarnings = function () {return options.MessageByType.Warning}
+    this.ListSuccess = function () {return options.MessageByType.Success}
 
     this.generateHtmlReport = function () {
         return `
