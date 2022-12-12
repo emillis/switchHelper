@@ -144,6 +144,17 @@ function SwitchReport() {
     this.generateHtmlReportAsFile = function(tmpFileLocation) {
         return CreateNewTmpFile(path.join(tmpFileLocation, GenerateNewName(`tmpHtml`, `_report.html`)), thisFunction.generateHtmlReport())
     }
+
+    this.sendJobToConnection = async function (job, tmpFileLocation) {
+        if (!job) {throw `"job" is not provided as an argument to method "sendJobToConnection"!`}
+        tmpFileLocation = tmpFileLocation || (GetGlobalSwitchConfig())["TempMetadataFileLocation"]
+
+        const ConnManager = new OutgoingConnectionManager(job);
+
+        const sender = thisFunction.ErrorCount() ? ConnManager.error : thisFunction.WarningCount() ? ConnManager.warning : ConnManager.success
+
+        await sender(thisFunction.generateHtmlReportAsFile(tmpFileLocation));
+    }
 }
 
 //Reads environmental variable passed in (which is supposed to point to a Switch Config JSON file), reads
@@ -159,7 +170,11 @@ function GetGlobalSwitchConfig(env_var = "SwitchConfig") {
         throw Error(`Path to global settings for switch "${loc}" defined in ENV variable "${env_var}" does not point to a JSON file!`)
     }
 
-    return JSON.parse(fs.readFileSync(loc, "utf-8"))
+    try {
+        return JSON.parse(fs.readFileSync(loc, "utf-8"))
+    } catch (e) {
+        throw `Invalid JSON file format referred from "${env_var}" environmental variable, location "${loc}"! Original error: "${e.toString()}"`
+    }
 }
 
 //Generates a date string in the following format: 20221011103552333. You can also define the separator.
