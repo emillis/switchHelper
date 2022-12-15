@@ -406,54 +406,104 @@ function CompareStrings(matchToThis, matchThis, options = {}) {
 //  allowedExt,     //An array of extensions that are allowed to be returned. E.g. ".pdf", ".csv", etc.. If nothing
 //                  //is defined, all extensions will be allowed.
 //  partialMatch,   //true/false whether to match the name in full or just partially. Default - true
+//  caseSensitive,  //true/false whether matching is going to be case-sensitive
 //  returnType,     //Return type can be one of three: "full", "name", "nameProper". Default - "full"
+//  depth,          //Folder hierarchy scan depth
+//  lookFor,        //What to look for. Allowed options are: "files", "folders", "both". Default - "files"
 //}
-function FindFilesInLocation(needle, haystack, options) {
+async function FindInLocation(needle, haystack, options) {
+    const startedTime = Date.now();
     options = options || {}
     if (typeof options !== "object") {throw Error(`Options must be of type "object", got "${typeof options}"!`)}
     options = {
         allowedExt: options.allowedExt || [],//empty array if nothing is defined
         allowAllExt: !options.allowedExt || !options.allowedExt.length, //true if nothing is defined
         partialMatch: options.partialMatch === undefined ? true : options.partialMatch, //true by default
-        returnType: options.returnType || "full"
+        caseSensitive: !!options.caseSensitive,
+        returnType: options.returnType || "full",
+        depth: options.depth || 0,
+        lookFor: options.lookFor === undefined ? "files" : `${options.lookFor}`
+    }
+    let response = {results: [], stats: {foldersScanned: 0, entitiesTested: 0, timeTaken: 0, resultsFound: 0}}
+
+    needle = options.caseSensitive ? needle : needle.toLowerCase()
+
+    let parsedAllowedExtensions = [];
+    for (let ext of options.allowedExt) {
+        ext = `${ext}`.replaceAll(` `, ``).toLowerCase()
+
+        if (!ext) {continue}
+
+        //Adding a dot (.) at the beginning if one doesn't exist
+        ext[0] === `.` || (ext = `.${ext}`)
+
+        if (parsedAllowedExtensions.includes(ext)) {
+            continue
+        }
+
+        options.allowAllExt = false
+        parsedAllowedExtensions.push(ext)
+    }
+    options.allowedExt = parsedAllowedExtensions;
+
+    const allowedReturnTypes = {full: "full", name: "name", nameProper: "nameProper"};
+    let allowedLookFor = {files: "files", folders: "folders", both: "both"};
+    if (!Object.values(allowedReturnTypes).includes(options.returnType)) {throw `Wrong returnType entered! Entered: "${options.returnType}", allowed are: "${Object.values(allowedReturnTypes).join(`", "`)}"`}
+    if (!Object.values(allowedLookFor).includes(options.lookFor)) {throw `Value "${options.lookFor}" passed to option "lookFor" is invalid! Allowed values are: "${Object.values(allowedLookFor).join(`", "`)}"`}
+
+    async function scanFolder(haystack, needle, depth) {
+        let newDepth = depth - 1;
+        response.stats.foldersScanned++
+
+        for (let dirent of fs.readdirSync(haystack, {withFileTypes: true, encoding: "utf-8"})) {
+            const hayOriginal = dirent.name;
+            response.stats.entitiesTested++
+            const hay = options.caseSensitive ? hayOriginal : hayOriginal.toLowerCase()
+            const fullPath = path.join(haystack, hayOriginal).replaceAll("\\", "/");
+
+            if (dirent.isDirectory() && newDepth >= 0) {
+                scanFolder(fullPath, needle, newDepth)
+            }
+
+            if (options.partialMatch && hay.search(needle) === -1) {
+                continue
+            } else if (!options.partialMatch && hay !== needle) {
+                continue
+            }
+
+            const parsedName = path.parse(hay);
+
+            if (!options.allowAllExt && !options.allowedExt.includes(parsedName.ext)) {
+                continue
+            }
+
+            const result = options.returnType === allowedReturnTypes.full ? fullPath : options.returnType === allowedReturnTypes.name ? hay : options.returnType === allowedReturnTypes.nameProper ? parsedName.name : undefined;
+            if (!result) {break}
+
+            if (options.lookFor !== allowedLookFor.both) {
+                if (options.lookFor === allowedLookFor.folders && dirent.isFile()) {
+                    continue
+                }
+
+                if (options.lookFor === allowedLookFor.files && dirent.isDirectory()) {
+                    continue
+                }
+            }
+
+            response.results.push(result)
+        }
     }
 
-    for (let i = 0; i<options.allowedExt.length; i++) {
-        if (options.allowedExt[i]) {
-            continue
-        }
-        options.allowedExt[i] = options.allowedExt[i][0] !== "." ? `.${options.allowedExt[i]}` : options.allowedExt[i]
+    if (!fs.existsSync(haystack)) {
+        return
     }
 
-    const allowedReturnTypes = ["full", "name", "nameProper"];
-    if (!allowedReturnTypes.includes(options.returnType)) {throw Error(`Wrong returnType entered! Entered: "${options.returnType}", allowed are: "${allowedReturnTypes.join(`", "`)}"`)}
+    await scanFolder(haystack, needle, options.depth)
 
-    let results = [];
-    const needleTLC = needle.toLowerCase()
+    response.stats.resultsFound = response.results.length
+    response.stats.timeTaken = Date.now() - startedTime
 
-    for (let hay of fs.readdirSync(haystack, "utf-8")) {
-        if (options.partialMatch && (hay.toLowerCase()).search(needleTLC) === -1) {
-            continue
-        } else if (!options.partialMatch && hay.toLowerCase() !== needleTLC) {
-            continue
-        }
-
-        const parsedName = path.parse(hay);
-
-        if (!options.allowedExt.includes(parsedName.ext) && !options.allowAllExt) {
-            continue
-        }
-
-        if (options.returnType === "full") {
-            results.push(path.join(haystack, hay).replaceAll("\\", "/"))
-        } else if (options.returnType === "name") {
-            results.push(hay)
-        } else if (options.returnType === "nameProper") {
-            results.push(parsedName.name)
-        }
-    }
-
-    return results
+    return response
 }
 
 //ParseCsvFile takes in .csv file, places its contents into an object for manipulation and can save it back to .csv
@@ -663,7 +713,7 @@ async function MatchFilesToCsvData(options = {}) {
         for (let i = 0; i< csvFileData.rows.length; i++) {
             let row = csvFileData.rows[i];
             const toMatch = row[columnToMatch.index]
-            const foundFiles = FindFilesInLocation(toMatch, match.scanLocation, o)
+            const foundFiles = FindInLocation(toMatch, match.scanLocation, o)
             const rowIndex = i + csvFile.rowsStartIndex();
 
             if (foundFiles.length < 1) {
@@ -748,7 +798,7 @@ module.exports = {
     ExcelToJsObject,
     CompareStrings,
     Delay,
-    FindFilesInLocation,
+    FindInLocation,
     CsvProcessor,
     MatchFilesToCsvData,
     OutgoingConnectionManager,
