@@ -417,7 +417,7 @@ async function FindInLocation(needle, haystack, options) {
     if (typeof options !== "object") {throw Error(`Options must be of type "object", got "${typeof options}"!`)}
     options = {
         allowedExt: options.allowedExt || [],//empty array if nothing is defined
-        allowAllExt: !options.allowedExt || !options.allowedExt.length, //true if nothing is defined
+        allowAllExt: true, //true if nothing is defined
         partialMatch: options.partialMatch === undefined ? true : options.partialMatch, //true by default
         caseSensitive: !!options.caseSensitive,
         returnType: options.returnType || "full",
