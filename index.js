@@ -407,7 +407,7 @@ function CompareStrings(matchToThis, matchThis, options = {}) {
 //                  //is defined, all extensions will be allowed.
 //  partialMatch,   //true/false whether to match the name in full or just partially. Default - true
 //  caseSensitive,  //true/false whether matching is going to be case-sensitive
-//  returnType,     //Return type can be one of three: "full", "name", "nameProper". Default - "full"
+//  returnType,     //Return types, needs to be an array with any number of following values: "full", "name", "nameProper". Default - ["full"]
 //  depth,          //Folder hierarchy scan depth
 //  lookFor,        //What to look for. Allowed options are: "files", "folders", "both". Default - "files"
 //}
@@ -420,11 +420,11 @@ async function FindInLocation(needle, haystack, options) {
         allowAllExt: true, //true if nothing is defined
         partialMatch: options.partialMatch === undefined ? true : options.partialMatch, //true by default
         caseSensitive: !!options.caseSensitive,
-        returnType: options.returnType || "full",
+        returnType: options.returnType && options.returnType.length ? options.returnType : ["full"],
         depth: options.depth || 0,
         lookFor: options.lookFor === undefined ? "files" : `${options.lookFor}`
     }
-    let response = {results: [], stats: {foldersScanned: 0, entitiesTested: 0, timeTaken: 0, resultsFound: 0}}
+    let response = {results: {}, stats: {foldersScanned: 0, entitiesTested: 0, timeTaken: 0, resultsFound: 0}}
 
     needle = options.caseSensitive ? needle : needle.toLowerCase()
 
@@ -448,7 +448,8 @@ async function FindInLocation(needle, haystack, options) {
 
     const allowedReturnTypes = {full: "full", name: "name", nameProper: "nameProper"};
     let allowedLookFor = {files: "files", folders: "folders", both: "both"};
-    if (!Object.values(allowedReturnTypes).includes(options.returnType)) {throw `Wrong returnType entered! Entered: "${options.returnType}", allowed are: "${Object.values(allowedReturnTypes).join(`", "`)}"`}
+    if (typeof options.returnType !== "object") {throw `Option "returnType" must be an array! Got "${typeof options.returnType}"!`}
+    for (const returnType of options.returnType) {if (!Object.values(allowedReturnTypes).includes(returnType)) {throw `Wrong returnType entered! Entered: "${options.returnType}", allowed are: "${Object.values(allowedReturnTypes).join(`", "`)}"`}}
     if (!Object.values(allowedLookFor).includes(options.lookFor)) {throw `Value "${options.lookFor}" passed to option "lookFor" is invalid! Allowed values are: "${Object.values(allowedLookFor).join(`", "`)}"`}
 
     async function scanFolder(haystack, needle, depth) {
@@ -471,14 +472,11 @@ async function FindInLocation(needle, haystack, options) {
                 continue
             }
 
-            const parsedName = path.parse(hay);
+            const parsedName = path.parse(hayOriginal);
 
-            if (!options.allowAllExt && !options.allowedExt.includes(parsedName.ext)) {
+            if (!options.allowAllExt && !options.allowedExt.includes(parsedName.ext.toLowerCase())) {
                 continue
             }
-
-            const result = options.returnType === allowedReturnTypes.full ? fullPath : options.returnType === allowedReturnTypes.name ? hay : options.returnType === allowedReturnTypes.nameProper ? parsedName.name : undefined;
-            if (!result) {break}
 
             if (options.lookFor !== allowedLookFor.both) {
                 if (options.lookFor === allowedLookFor.folders && dirent.isFile()) {
@@ -490,7 +488,10 @@ async function FindInLocation(needle, haystack, options) {
                 }
             }
 
-            response.results.push(result)
+            for (const returnType of options.returnType || []) {
+                response.results[returnType] = response.results[returnType] || []
+                response.results[returnType].push(returnType === allowedReturnTypes.full ? fullPath : returnType === allowedReturnTypes.name ? hayOriginal : returnType === allowedReturnTypes.nameProper ? parsedName.name : undefined)
+            }
         }
     }
 
