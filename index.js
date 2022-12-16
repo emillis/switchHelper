@@ -492,6 +492,7 @@ async function FindInLocation(needle, haystack, options) {
                 response.results[returnType] = response.results[returnType] || []
                 response.results[returnType].push(returnType === allowedReturnTypes.full ? fullPath : returnType === allowedReturnTypes.name ? hayOriginal : returnType === allowedReturnTypes.nameProper ? parsedName.name : undefined)
             }
+            response.stats.resultsFound++
         }
     }
 
@@ -501,7 +502,6 @@ async function FindInLocation(needle, haystack, options) {
 
     await scanFolder(haystack, needle, options.depth)
 
-    response.stats.resultsFound = response.results.length
     response.stats.timeTaken = Date.now() - startedTime
 
     return response
