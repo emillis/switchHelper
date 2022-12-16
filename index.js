@@ -403,13 +403,14 @@ function CompareStrings(matchToThis, matchThis, options = {}) {
 //needle - what to look for in the haystack.
 //haystack - root system location where to scan
 //options - {
-//  allowedExt,     //An array of extensions that are allowed to be returned. E.g. ".pdf", ".csv", etc.. If nothing
-//                  //is defined, all extensions will be allowed.
-//  partialMatch,   //true/false whether to match the name in full or just partially. Default - true
-//  caseSensitive,  //true/false whether matching is going to be case-sensitive
-//  returnType,     //Return types, needs to be an array with any number of following values: "full", "name", "nameProper". Default - ["full"]
-//  depth,          //Folder hierarchy scan depth
-//  lookFor,        //What to look for. Allowed options are: "files", "folders", "both". Default - "files"
+//  allowedExt,             //An array of extensions that are allowed to be returned. E.g. ".pdf", ".csv", etc.. If nothing
+//                          //is defined, all extensions will be allowed.
+//  partialMatch,           //true/false whether to match the name in full or just partially. Default - true
+//  caseSensitive,          //true/false whether matching is going to be case-sensitive
+//  returnType,             //Return types, needs to be an array with any number of following values: "full", "name", "nameProper". Default - ["full"]
+//  depth,                  //Folder hierarchy scan depth
+//  lookFor,                //What to look for. Allowed options are: "files", "folders", "both". Default - "files"
+//  ifHaystackNotFound,     //What to do if haystack location doesn't exist. Options: "returnEmptyResults", "throwError". Default = "returnEmptyResults"
 //}
 async function FindInLocation(needle, haystack, options) {
     const startedTime = Date.now();
@@ -422,7 +423,8 @@ async function FindInLocation(needle, haystack, options) {
         caseSensitive: !!options.caseSensitive,
         returnType: options.returnType && options.returnType.length ? options.returnType : ["full"],
         depth: options.depth || 0,
-        lookFor: options.lookFor === undefined ? "files" : `${options.lookFor}`
+        lookFor: options.lookFor === undefined ? "files" : `${options.lookFor}`,
+        ifHaystackNotFound: options.ifHaystackNotFound || "returnEmptyResults"
     }
     let response = {results: {}, stats: {foldersScanned: 0, entitiesTested: 0, timeTaken: 0, resultsFound: 0}}
 
@@ -448,9 +450,20 @@ async function FindInLocation(needle, haystack, options) {
 
     const allowedReturnTypes = {full: "full", name: "name", nameProper: "nameProper"};
     let allowedLookFor = {files: "files", folders: "folders", both: "both"};
+    let allowedIfHaystackNotFound = {returnEmptyResults: "returnEmptyResults", throwError: "throwError"};
+    if (!allowedIfHaystackNotFound[options.ifHaystackNotFound]) {throw `Option "${options.ifHaystackNotFound}" not allowed in field "ifHaystackNotFound". Allowed options are: "${Object.keys(allowedIfHaystackNotFound).join(`", "`)}"`}
     if (typeof options.returnType !== "object") {throw `Option "returnType" must be an array! Got "${typeof options.returnType}"!`}
     for (const returnType of options.returnType) {if (!Object.values(allowedReturnTypes).includes(returnType)) {throw `Wrong returnType entered! Entered: "${options.returnType}", allowed are: "${Object.values(allowedReturnTypes).join(`", "`)}"`}}
     if (!Object.values(allowedLookFor).includes(options.lookFor)) {throw `Value "${options.lookFor}" passed to option "lookFor" is invalid! Allowed values are: "${Object.values(allowedLookFor).join(`", "`)}"`}
+    if (!fs.existsSync(haystack)) {
+        if (options.ifHaystackNotFound === allowedIfHaystackNotFound.throwError) {
+            throw `Haystack "${haystack}" provided does not exist!`
+        }
+
+        if (options.ifHaystackNotFound === allowedIfHaystackNotFound.returnEmptyResults) {
+            return response
+        }
+    }
 
     async function scanFolder(haystack, needle, depth) {
         let newDepth = depth - 1;
