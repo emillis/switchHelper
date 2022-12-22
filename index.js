@@ -769,7 +769,6 @@ async function MatchFilesToCsvData(options = {}) {
 
 //Provides an easy way of managing "Traffic Lights" switch connection type
 function OutgoingConnectionManager(switchJob, newName) {
-    newName = `${newName}`
     const job = switchJob;
     const allowedLevels = ["success", "warning", "error"];
 
