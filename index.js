@@ -765,6 +765,8 @@ async function MatchFilesToCsvData(options = {}) {
     }
 }
 
+// console.log(path.parse("C:/Test/Artwork.pdf"));
+
 //Provides an easy way of managing "Traffic Lights" switch connection type
 function OutgoingConnectionManager(switchJob, newName) {
     const job = switchJob;
@@ -775,12 +777,13 @@ function OutgoingConnectionManager(switchJob, newName) {
         if (report && !fs.existsSync(report.toString())) {throw Error(`Report doesn't exist in the location "${report.toString()}" provided!`)}
 
         try {
+            const newNameNameOnly = path.parse(newName).name;
             if (report) {
                 const reportJob = await job.createChild(report);
-                await reportJob.sendToLog(level, "Opaque", `${newName}`);
+                await reportJob.sendToLog(level, "Opaque", `${newNameNameOnly}${path.parse(report).ext}`);
             }
 
-            await job.sendToData(level, `${newName}`);
+            await job.sendToData(level, `${newNameNameOnly}${path.parse(await job.getName()).ext}`);
         } catch (e) {
             await job.log("error", e.toString());
         }
