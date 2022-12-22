@@ -158,11 +158,11 @@ function SwitchReport() {
         return CreateNewTmpFile(path.join(tmpFileLocation, GenerateNewName(`tmpHtml`, `_report.html`)), thisFunction.generateHtmlReport())
     }
 
-    this.sendJobToConnection = async function (job, tmpFileLocation) {
+    this.sendJobToConnection = async function (job, tmpFileLocation, newName) {
         if (!job) {throw `"job" is not provided as an argument to method "sendJobToConnection"!`}
         tmpFileLocation = tmpFileLocation || (GetGlobalSwitchConfig())["TempMetadataFileLocation"]
 
-        const ConnManager = new OutgoingConnectionManager(job);
+        const ConnManager = new OutgoingConnectionManager(job, newName);
 
         const sender = thisFunction.ErrorCount() ? ConnManager.error : thisFunction.WarningCount() ? ConnManager.warning : ConnManager.success
 
@@ -766,21 +766,21 @@ async function MatchFilesToCsvData(options = {}) {
 }
 
 //Provides an easy way of managing "Traffic Lights" switch connection type
-function OutgoingConnectionManager(switchJob) {
+function OutgoingConnectionManager(switchJob, newName) {
     const job = switchJob;
     const allowedLevels = ["success", "warning", "error"];
 
     async function send(level, report) {
-        if (!allowedLevels.includes(level)) {throw Error(`Invalid connection level supplied! Expected "${allowedLevels.join(`" or "`)}", got "${lvl}"`)}
+        if (!allowedLevels.includes(level)) {throw Error(`Invalid connection level supplied! Expected "${allowedLevels.join(`" or "`)}", got "${level}"`)}
         if (report && !fs.existsSync(report.toString())) {throw Error(`Report doesn't exist in the location "${report.toString()}" provided!`)}
 
         try {
             if (report) {
                 const reportJob = await job.createChild(report);
-                await reportJob.sendToLog(level, "Opaque");
+                await reportJob.sendToLog(level, "Opaque", `${newName}`);
             }
 
-            await job.sendToData(level);
+            await job.sendToData(level, `${newName}`);
         } catch (e) {
             await job.log("error", e.toString());
         }
