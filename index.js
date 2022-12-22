@@ -769,6 +769,7 @@ async function MatchFilesToCsvData(options = {}) {
 
 //Provides an easy way of managing "Traffic Lights" switch connection type
 function OutgoingConnectionManager(switchJob, newName) {
+    newName = `${newName}`
     const job = switchJob;
     const allowedLevels = ["success", "warning", "error"];
 
@@ -777,13 +778,21 @@ function OutgoingConnectionManager(switchJob, newName) {
         if (report && !fs.existsSync(report.toString())) {throw Error(`Report doesn't exist in the location "${report.toString()}" provided!`)}
 
         try {
-            const newNameNameOnly = path.parse(newName).name;
-            if (report) {
-                const reportJob = await job.createChild(report);
-                await reportJob.sendToLog(level, "Opaque", `${newNameNameOnly}${path.parse(report).ext}`);
+            let reportName = undefined;
+            let outputFileName = undefined;
+            if (newName) {
+                const newNameNameOnly = path.parse(newName).name;
+
+                reportName = `${newNameNameOnly}${path.parse(report).ext}`;
+                outputFileName = `${newNameNameOnly}${path.parse(await job.getName()).ext}`;
             }
 
-            await job.sendToData(level, `${newNameNameOnly}${path.parse(await job.getName()).ext}`);
+            if (report) {
+                const reportJob = await job.createChild(report);
+                await reportJob.sendToLog(level, "Opaque", reportName);
+            }
+
+            await job.sendToData(level, outputFileName);
         } catch (e) {
             await job.log("error", e.toString());
         }
