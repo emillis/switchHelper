@@ -227,9 +227,7 @@ function CreateNewTmpFile(location = "", content = "", overwrite = false) {
         parsedLoc = path.parse(path.join(parsedLoc.dir, parsedLoc.base, GenerateNewName("tmp_generic_file", ".txt")))
     }
 
-    if (!fs.existsSync(parsedLoc.dir)) {
-        fs.mkdirSync(parsedLoc.dir)
-    }
+    if (!fs.existsSync(parsedLoc.dir)) {fs.mkdirSync(parsedLoc.dir)}
 
     let fullPath = path.join(parsedLoc.dir, parsedLoc.base);
 
@@ -350,7 +348,7 @@ function ExcelToJsObject(excel_location, options = {}) {
         ignore_hidden_sheets: options.ignore_hidden_sheets === undefined ? true : options.ignore_hidden_sheets,
         skip_hidden_rows: options.skip_hidden_rows === undefined ? true : options.skip_hidden_rows,
         include_blank_rows: options.include_blank_rows === undefined ? false : options.include_blank_rows,
-        min_no_of_rows: options.min_no_of_rows === undefined ? 2 : options.min_no_of_rows
+        min_no_of_rows: options.min_no_of_rows === undefined ? 1 : options.min_no_of_rows
     };
 
     if (!fs.existsSync(excel_location)) {
@@ -396,7 +394,7 @@ function CompareStrings(matchToThis, matchThis, options = {}) {
         matchToThis = matchToThis.toLowerCase()
     }
 
-    return options.match_partial ? matchToThis.search(matchThis) !== -1 : matchToThis === matchThis;
+    return options.match_partial ? matchToThis.includes(matchThis) : matchToThis === matchThis;
 }
 
 //This function allows to scan a system location and returns the results
@@ -764,8 +762,6 @@ async function MatchFilesToCsvData(options = {}) {
         },
     }
 }
-
-// console.log(path.parse("C:/Test/Artwork.pdf"));
 
 //Provides an easy way of managing "Traffic Lights" switch connection type
 function OutgoingConnectionManager(switchJob, newName) {
